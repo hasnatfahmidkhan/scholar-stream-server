@@ -28,6 +28,7 @@ async function run() {
 
     const db = client.db("SchollerStream");
     const usersCollection = db.collection("users");
+    const scholarshipsCollection = db.collection("scholarships");
 
     //? users api
     app.post("/users", async (req, res) => {
@@ -39,6 +40,13 @@ async function run() {
       }
       const result = await usersCollection.insertOne(userInfo);
       res.status(201).json(result);
+    });
+
+    //? scholarships api
+    app.get("/scholarships", async (req, res) => {
+      const sort = { applicationFees: 1, scholarshipPostDate: -1 };
+      const result = await scholarshipsCollection.find().sort(sort).toArray();
+      res.status(200).json(result);
     });
 
     await client.db("admin").command({ ping: 1 });
