@@ -3,7 +3,7 @@ dotenv.config();
 
 import express from "express";
 import cors from "cors";
-import { MongoClient, ServerApiVersion } from "mongodb";
+import { MongoClient, ObjectId, ServerApiVersion } from "mongodb";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 const app = express();
@@ -45,7 +45,28 @@ async function run() {
     //? scholarships api
     app.get("/scholarships", async (req, res) => {
       const sort = { applicationFees: 1, scholarshipPostDate: -1 };
-      const result = await scholarshipsCollection.find().sort(sort).toArray();
+      const { limit = 0, schCat = "", subCat = "", loc = "" } = req.query;
+      const query = {};
+      if (schCat) {
+        query.scholarshipCategory = { $regex: schCat, $options: "i" };
+      }
+      if (subCat) {
+        query.subjectCategory = { $regex: subCat, $options: "i" };
+      }
+      if (loc) {
+        query.universityCountry = { $regex: loc, $options: "i" };
+      }
+      const result = await scholarshipsCollection
+        .find(query)
+        .sort(sort)
+        .toArray();
+      res.status(200).json(result);
+    });
+
+    app.get("/scholarship/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await scholarshipsCollection.findOne(query);
       res.status(200).json(result);
     });
 
