@@ -45,7 +45,14 @@ async function run() {
     //? scholarships api
     app.get("/scholarships", async (req, res) => {
       const sort = { applicationFees: 1, scholarshipPostDate: -1 };
-      const { limit = 0, schCat = "", subCat = "", loc = "" } = req.query;
+      const {
+        limit = 0,
+        schCat = "",
+        subCat = "",
+        loc = "",
+        search = "",
+      } = req.query;
+
       const query = {};
       if (schCat) {
         query.scholarshipCategory = { $regex: schCat, $options: "i" };
@@ -56,6 +63,15 @@ async function run() {
       if (loc) {
         query.universityCountry = { $regex: loc, $options: "i" };
       }
+
+      if (search) {
+        query.$or = [
+          { scholarshipName: { $regex: search, $options: "i" } },
+          { universityName: { $regex: search, $options: "i" } },
+          { degree: { $regex: search, $options: "i" } },
+        ];
+      }
+
       const result = await scholarshipsCollection
         .find(query)
         .sort(sort)
