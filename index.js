@@ -4,11 +4,12 @@ dotenv.config();
 import express from "express";
 import cors from "cors";
 import { MongoClient, ObjectId, ServerApiVersion } from "mongodb";
+import Stripe from "stripe";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 const app = express();
 const port = process.env.PORT || 3000;
-
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 app.use(express.json());
 app.use(cors());
 
@@ -73,7 +74,14 @@ async function run() {
       }
 
       const result = await scholarshipsCollection
-        .find(query)
+        .find(query, {
+          projection: {
+            postedUserEmail: 0,
+            serviceCharge: 0,
+            universityCity: 0,
+            universityWorldRank: 0,
+          },
+        })
         .sort(sort)
         .toArray();
       res.status(200).json(result);
@@ -84,6 +92,69 @@ async function run() {
       const query = { _id: new ObjectId(id) };
       const result = await scholarshipsCollection.findOne(query);
       res.status(200).json(result);
+    });
+
+    //! payment api
+    app.post("/create-checkout-session", async (req, res) => {
+      const {
+        totalPrice,
+        studentName,
+        studentEmail,
+        scholarshipId,
+        scholarshipName,
+        universityName,
+        universityImage,
+      } = req.body;
+
+      const isScholarshipExits = await scholarshipsCollection.findOne(
+        new ObjectId(scholarshipId)
+      );
+
+      if (!isScholarshipExits) {
+        return res.status(404).json({ message: "Scholarship not found" });
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: `Application for: ${scholarshipName}`,
+                description: `University: ${universityName}`,
+                images: [universityImage],
+                metadata: {
+                  scholarshipId,
+                },
+              },
+              unit_amount: totalPrice * 100,
+            },
+            quantity: 1,
+          },
+        ],
+        customer_email: studentEmail,
+        mode: "payment",
+        metadata: {
+          studentEmail,
+          studentName,
+        },
+        success_url: `${process.env.DOMAIN_URL}/payment/success?sessionId={CHECKOUT_SESSION_ID}&scholarshipId=${scholarshipId}`,
+        cancel_url: `${process.env.DOMAIN_URL}/scholarship/${scholarshipId}`,
+      });
+
+      res.json({ url: session.url });
+    });
+
+    app.post("/payment-success", async (req, res) => {
+      const { sessionId } = req.body;
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      // console.log(session);
+      const { amount_total, metadata, payment_intent, payment_status } =
+        session;
+      const { studentEmail, studentName } = metadata;
+      if (payment_status === "paid") {
+        
+      }
     });
 
     await client.db("admin").command({ ping: 1 });
