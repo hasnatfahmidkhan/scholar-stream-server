@@ -30,6 +30,7 @@ async function run() {
     const db = client.db("SchollerStream");
     const usersCollection = db.collection("users");
     const scholarshipsCollection = db.collection("scholarships");
+    const applicationsCollection = db.collection("applications");
 
     //? users api
     app.post("/users", async (req, res) => {
@@ -98,23 +99,72 @@ async function run() {
     app.post("/create-checkout-session", async (req, res) => {
       const {
         totalPrice,
-        studentName,
-        studentEmail,
-        scholarshipId,
-        scholarshipName,
+        userName,
+        userEmail,
         universityName,
         universityImage,
+        scholarshipId,
+        scholarshipName,
+        scholarshipCategory,
+        degree,
+        applicationFees,
+        serviceCharge,
       } = req.body;
 
-      const isScholarshipExits = await scholarshipsCollection.findOne(
-        new ObjectId(scholarshipId)
-      );
+      const isScholarshipExits = await scholarshipsCollection.findOne({
+        _id: new ObjectId(scholarshipId),
+      });
 
       if (!isScholarshipExits) {
         return res.status(404).json({ message: "Scholarship not found" });
       }
 
+      const isExitsApplication = await applicationsCollection.findOne({
+        scholarshipId: scholarshipId,
+        userEmail: userEmail,
+      });
+
+      if (isExitsApplication) {
+        // if user unpaid then show this message
+        if (isExitsApplication.paymentStatus === "unpaid") {
+          return res.status(409).json({
+            message:
+              "You have a pending application. Please pay from your dashboard.",
+            insertedId: null,
+          });
+        }
+        // else user already paid
+        else {
+          return res.status(409).json({
+            message:
+              "You have already completed the application for this scholarship.",
+            insertedId: null,
+          });
+        }
+      }
+
+      // if user not apply then insert data
+      const applicationInfo = {
+        scholarshipId,
+        userEmail,
+        userName,
+        universityName,
+        scholarshipCategory,
+        degree,
+        applicationFees,
+        serviceCharge,
+        applicationStatus: "pending",
+        paymentStatus: "unpaid",
+        applicationDate: new Date().toISOString(),
+      };
+
+      const applicatioinResult = await applicationsCollection.insertOne(
+        applicationInfo
+      );
+
+      // Create Stripe Session
       const session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
         line_items: [
           {
             price_data: {
@@ -123,23 +173,21 @@ async function run() {
                 name: `Application for: ${scholarshipName}`,
                 description: `University: ${universityName}`,
                 images: [universityImage],
-                metadata: {
-                  scholarshipId,
-                },
               },
-              unit_amount: totalPrice * 100,
+              unit_amount: Math.round(totalPrice * 100),
             },
             quantity: 1,
           },
         ],
-        customer_email: studentEmail,
+        customer_email: userEmail,
         mode: "payment",
         metadata: {
-          studentEmail,
-          studentName,
+          applicationId: applicatioinResult.insertedId.toString(),
+          scholarshipId: scholarshipId,
+          userEmail: userEmail,
         },
-        success_url: `${process.env.DOMAIN_URL}/payment/success?sessionId={CHECKOUT_SESSION_ID}&scholarshipId=${scholarshipId}`,
-        cancel_url: `${process.env.DOMAIN_URL}/scholarship/${scholarshipId}`,
+        success_url: `${process.env.DOMAIN_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.DOMAIN_URL}/payment/fail`,
       });
 
       res.json({ url: session.url });
@@ -151,9 +199,8 @@ async function run() {
       // console.log(session);
       const { amount_total, metadata, payment_intent, payment_status } =
         session;
-      const { studentEmail, studentName } = metadata;
+      const { userEmail, userName } = metadata;
       if (payment_status === "paid") {
-        
       }
     });
 
