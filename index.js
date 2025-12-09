@@ -127,7 +127,7 @@ async function run() {
       if (isExitsApplication) {
         // if user unpaid then show this message
         if (isExitsApplication.paymentStatus === "unpaid") {
-          return res.status(409).json({
+          return res.json({
             message:
               "You have a pending application. Please pay from your dashboard.",
             insertedId: null,
@@ -135,7 +135,7 @@ async function run() {
         }
         // else user already paid
         else {
-          return res.status(409).json({
+          return res.json({
             message:
               "You have already completed the application for this scholarship.",
             insertedId: null,
@@ -193,14 +193,73 @@ async function run() {
       res.json({ url: session.url });
     });
 
-    app.post("/payment-success", async (req, res) => {
+    app.patch("/payment/success", async (req, res) => {
       const { sessionId } = req.body;
-      const session = await stripe.checkout.sessions.retrieve(sessionId);
-      // console.log(session);
-      const { amount_total, metadata, payment_intent, payment_status } =
-        session;
-      const { userEmail, userName } = metadata;
-      if (payment_status === "paid") {
+
+      try {
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        const { amount_total, metadata, payment_intent, payment_status } =
+          session;
+
+        // Ensure metadata exists
+        if (!metadata || !metadata.applicationId) {
+          return res
+            .status(400)
+            .send({ success: false, message: "Invalid Session Metadata" });
+        }
+
+        const { applicationId } = metadata;
+
+        if (payment_status === "paid") {
+          const query = { _id: new ObjectId(applicationId) };
+
+          const updatedDoc = {
+            $set: {
+              paymentStatus: payment_status,
+              transactionId: payment_intent,
+              amountPaid: amount_total / 100,
+            },
+          };
+
+          const applicationUpdate = await applicationsCollection.updateOne(
+            query,
+            updatedDoc
+          );
+
+          if (applicationUpdate.modifiedCount) {
+            const applicationInfo = await applicationsCollection.findOne(query);
+
+            return res.status(200).json({
+              success: true,
+              data: applicationInfo,
+              message: "Payment confirmed",
+            });
+          } else {
+            // Handle case where it wasn't modified (maybe already paid)
+            // when user reload or again come to the page
+            const applicationInfo = await applicationsCollection.findOne(query);
+
+            if (applicationInfo && applicationInfo.paymentStatus === "paid") {
+              return res.status(200).json({
+                success: true,
+                message: "Already Paid",
+                data: applicationInfo,
+              });
+            }
+            return res
+              .status(400)
+              .send({ success: false, message: "Update failed" });
+          }
+        } else {
+          return res
+            .status(400)
+            .send({ success: false, message: "Payment not completed" });
+        }
+      } catch (error) {
+        console.error("Payment Error:", error);
+        return res
+          .status(500)
+          .send({ success: false, message: "Internal Server Error" });
       }
     });
 
