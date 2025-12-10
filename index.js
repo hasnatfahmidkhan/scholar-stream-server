@@ -256,7 +256,7 @@ async function run() {
       res.json({ url: session.url });
     });
 
-    app.patch("/payment/success", async (req, res) => {
+    app.patch("/payment/success", verifyJWTToken, async (req, res) => {
       const { sessionId } = req.body;
 
       try {
@@ -264,14 +264,22 @@ async function run() {
         const { amount_total, metadata, payment_intent, payment_status } =
           session;
 
-        // Ensure metadata exists
-        if (!metadata || !metadata.applicationId) {
+        const tokenEmail = req.user.email;
+
+        if (!metadata || !metadata.applicationId || !metadata.userEmail) {
           return res
             .status(400)
             .send({ success: false, message: "Invalid Session Metadata" });
         }
 
-        const { applicationId } = metadata;
+        const { applicationId, userEmail } = metadata;
+
+        if (tokenEmail !== userEmail) {
+          return res.status(403).send({
+            success: false,
+            message: "Forbidden: Access denied. Email mismatch.",
+          });
+        }
 
         if (payment_status === "paid") {
           const query = { _id: new ObjectId(applicationId) };
