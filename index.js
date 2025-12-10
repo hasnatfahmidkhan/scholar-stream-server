@@ -1,15 +1,19 @@
-import dotenv from "dotenv";
-dotenv.config();
+require("dotenv").config();
 
-import express from "express";
-import cors from "cors";
-import { MongoClient, ObjectId, ServerApiVersion } from "mongodb";
-import Stripe from "stripe";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
+const express = require("express");
+const cors = require("cors");
+const { MongoClient, ObjectId, ServerApiVersion } = require("mongodb");
+const Stripe = require("stripe");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 const app = express();
 const port = process.env.PORT || 3000;
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+
+// middleware
+app.use(cookieParser());
 app.use(express.json());
 app.use(
   cors({
@@ -18,6 +22,20 @@ app.use(
   })
 );
 const uri = process.env.MONGODB_URL;
+
+const verifyJWTToken = (req, res, next) => {
+  const token = req.cookies?.token;
+  if (!token) {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ message: "unauthorized access" });
+    }
+    req.user = decoded;
+    next();
+  });
+};
 
 const client = new MongoClient(uri, {
   serverApi: {
@@ -133,11 +151,10 @@ async function run() {
     });
 
     //! payment api
-    app.post("/create-checkout-session", async (req, res) => {
+    app.post("/create-checkout-session", verifyJWTToken, async (req, res) => {
       const {
         totalPrice,
         userName,
-        userEmail,
         universityName,
         universityImage,
         scholarshipId,
@@ -147,6 +164,15 @@ async function run() {
         applicationFees,
         serviceCharge,
       } = req.body;
+
+      const tokenEmail = req.user.email;
+      if (req.body.userEmail !== tokenEmail) {
+        return res
+          .status(403)
+          .send({ message: "Forbidden: You can only apply for yourself" });
+      }
+
+      const userEmail = tokenEmail;
 
       const isScholarshipExits = await scholarshipsCollection.findOne({
         _id: new ObjectId(scholarshipId),
