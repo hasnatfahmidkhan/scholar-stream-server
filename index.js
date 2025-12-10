@@ -11,8 +11,12 @@ const app = express();
 const port = process.env.PORT || 3000;
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 app.use(express.json());
-app.use(cors());
-
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "http://localhost:5174"],
+    credentials: true,
+  })
+);
 const uri = process.env.MONGODB_URL;
 
 const client = new MongoClient(uri, {
@@ -22,8 +26,6 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   },
 });
-
-// const
 
 async function run() {
   try {
@@ -44,6 +46,31 @@ async function run() {
       }
       const result = await usersCollection.insertOne(userInfo);
       res.status(201).json(result);
+    });
+
+    // get JWT Token
+    app.post("/getToken", async (req, res) => {
+      const userInfo = req.body;
+      const token = jwt.sign(userInfo, process.env.JWT_SECRET, {
+        expiresIn: "1h",
+      });
+      res
+        .cookie("token", token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        })
+        .send({ success: true });
+    });
+
+    app.post("/logout", async (req, res) => {
+      res
+        .clearCookie("token", {
+          maxAge: 0,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        })
+        .send({ success: true });
     });
 
     //? scholarships api
