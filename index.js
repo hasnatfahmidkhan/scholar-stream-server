@@ -23,6 +23,8 @@ const client = new MongoClient(uri, {
   },
 });
 
+// const
+
 async function run() {
   try {
     await client.connect();
@@ -46,16 +48,23 @@ async function run() {
 
     //? scholarships api
     app.get("/scholarships", async (req, res) => {
-      const sort = { applicationFees: 1, scholarshipPostDate: -1 };
       const {
         limit = 0,
         schCat = "",
         subCat = "",
         loc = "",
         search = "",
+        sort = "",
       } = req.query;
+      let sortFilter = { applicationFees: 1, scholarshipPostDate: -1 };
 
       const query = {};
+      if (sort === "asc") {
+        sortFilter = { applicationFees: 1 };
+      }
+      if (sort === "dsc") {
+        sortFilter = { applicationFees: -1 };
+      }
       if (schCat) {
         query.scholarshipCategory = { $regex: schCat, $options: "i" };
       }
@@ -83,7 +92,8 @@ async function run() {
             universityWorldRank: 0,
           },
         })
-        .sort(sort)
+        .limit(Number(limit))
+        .sort(sortFilter)
         .toArray();
       res.status(200).json(result);
     });
@@ -187,7 +197,7 @@ async function run() {
           userEmail: userEmail,
         },
         success_url: `${process.env.DOMAIN_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.DOMAIN_URL}/payment/fail`,
+        cancel_url: `${process.env.DOMAIN_URL}/payment/fail?scholarshipName=${scholarshipName}`,
       });
 
       res.json({ url: session.url });
