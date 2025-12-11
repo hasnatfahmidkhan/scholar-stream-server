@@ -150,6 +150,12 @@ async function run() {
       res.status(200).json(result);
     });
 
+    app.post("/add-scholarship", async (req, res) => {
+      const scholarshipInfo = req.body;
+      const result = await scholarshipsCollection.insertOne(scholarshipInfo);
+      res.status(201).json(result);
+    });
+
     //! payment api
     app.post("/create-checkout-session", verifyJWTToken, async (req, res) => {
       const {
@@ -272,7 +278,7 @@ async function run() {
             .send({ success: false, message: "Invalid Session Metadata" });
         }
 
-        const { applicationId, userEmail } = metadata;
+        const { applicationId, userEmail, scholarshipId } = metadata;
 
         if (tokenEmail !== userEmail) {
           return res.status(403).send({
@@ -298,6 +304,15 @@ async function run() {
           );
 
           if (applicationUpdate.modifiedCount) {
+            await scholarshipsCollection.updateOne(
+              { _id: new ObjectId(scholarshipId) },
+              {
+                $inc: {
+                  applicantNumber: 1,
+                },
+              }
+            );
+
             const applicationInfo = await applicationsCollection.findOne(query);
 
             return res.status(200).json({
