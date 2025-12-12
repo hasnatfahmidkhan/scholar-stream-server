@@ -149,9 +149,17 @@ async function run() {
       res.status(201).json(result);
     });
 
-    app.delete("/scholarship/:id", async (req, res) => {
+    app.delete("/scholarship/:id", verifyJWTToken, async (req, res) => {
       const id = req.params.id;
+      const { adminEmail } = req.query;
+      const tokenEmail = req.user.email;
       const query = { _id: new ObjectId(id) };
+      if (adminEmail !== tokenEmail) {
+        return res.status(403).json({
+          success: false,
+          message: "Forbidden: Access denied. Email mismatch.",
+        });
+      }
       const result = await scholarshipsCollection.deleteOne(query);
       res.status(200).json(result);
     });
