@@ -129,14 +129,7 @@ async function run() {
       }
 
       const result = await scholarshipsCollection
-        .find(query, {
-          projection: {
-            postedUserEmail: 0,
-            serviceCharge: 0,
-            universityCity: 0,
-            universityWorldRank: 0,
-          },
-        })
+        .find(query)
         .limit(Number(limit))
         .sort(sortFilter)
         .toArray();
