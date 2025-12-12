@@ -55,9 +55,28 @@ async function run() {
     const applicationsCollection = db.collection("applications");
 
     //? users api
+    app.get("/users", verifyJWTToken, async (req, res) => {
+      const { search = "", filter = "" } = req.query;
+      console.log(filter);
+      const query = {};
+      if (search) {
+        query.$or = [
+          { displayName: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+        ];
+      }
+
+      if (filter) {
+        query.role = filter;
+      }
+      const result = await usersCollection.find(query).toArray();
+      res.status(200).json(result);
+    });
+
     app.post("/users", async (req, res) => {
       const userInfo = req.body;
       userInfo.role = "student";
+      userInfo.createdAt = new Date().toISOString();
       const isExits = await usersCollection.findOne({ email: userInfo.email });
       if (isExits) {
         return res.json({ message: "user already exits" });
@@ -143,13 +162,13 @@ async function run() {
       res.status(200).json(result);
     });
 
-    app.post("/add-scholarship", async (req, res) => {
+    app.post("/add-scholarship", verifyJWTToken, async (req, res) => {
       const scholarshipInfo = req.body;
       const result = await scholarshipsCollection.insertOne(scholarshipInfo);
       res.status(201).json(result);
     });
 
-    app.patch("/scholarship/:id", async (req, res) => {
+    app.patch("/scholarship/:id", verifyJWTToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const updatedDoc = { $set: req.body };
