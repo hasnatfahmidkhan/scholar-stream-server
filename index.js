@@ -99,7 +99,7 @@ async function run() {
       res.status(200).json(result);
     });
 
-    // get JWT Token
+    //? get JWT Token
     app.post("/getToken", async (req, res) => {
       const userInfo = req.body;
       const token = jwt.sign(userInfo, process.env.JWT_SECRET, {
@@ -203,6 +203,75 @@ async function run() {
       }
       const result = await scholarshipsCollection.deleteOne(query);
       res.status(200).json(result);
+    });
+
+    //? Analytics page api
+    app.get("/analytics", async (req, res) => {
+      const totalScholaships = await scholarshipsCollection.countDocuments();
+      const totalUsers = await usersCollection.countDocuments();
+      const totalFessData = await applicationsCollection
+        .aggregate([
+          {
+            $group: {
+              _id: null,
+              totalFees: { $sum: "$amountPaid" },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              totalFees: 1,
+            },
+          },
+        ])
+        .toArray();
+      const totalFees = totalFessData[0]?.totalFees || 0;
+
+      const appsByCategory = await applicationsCollection
+        .aggregate([
+          {
+            $group: {
+              _id: "$scholarshipCategory",
+              count: { $sum: 1 },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              category: "$_id",
+              count: 1,
+            },
+          },
+        ])
+        .sort({ count: -1 })
+        .toArray();
+
+      const appsByUniversity = await applicationsCollection
+        .aggregate([
+          {
+            $group: {
+              _id: "$universityName",
+              count: { $sum: 1 },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              universityName: "$_id",
+              count: 1,
+            },
+          },
+        ])
+        .sort({ count: -1 })
+        .toArray();
+
+      res.send({
+        totalScholaships,
+        totalUsers,
+        totalFees,
+        appsByCategory,
+        appsByUniversity,
+      });
     });
 
     //! payment api
