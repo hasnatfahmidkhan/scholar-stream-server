@@ -149,6 +149,13 @@ async function run() {
       res.status(201).json(result);
     });
 
+    app.delete("/scholarship/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await scholarshipsCollection.deleteOne(query);
+      res.status(200).json(result);
+    });
+
     //! payment api
     app.post("/create-checkout-session", verifyJWTToken, async (req, res) => {
       const {
