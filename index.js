@@ -57,7 +57,6 @@ async function run() {
     //? users api
     app.get("/users", verifyJWTToken, async (req, res) => {
       const { search = "", filter = "" } = req.query;
-      console.log(filter);
       const query = {};
       if (search) {
         query.$or = [
@@ -83,6 +82,13 @@ async function run() {
       }
       const result = await usersCollection.insertOne(userInfo);
       res.status(201).json(result);
+    });
+
+    app.delete("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await usersCollection.deleteOne(query);
+      res.status(200).json(result);
     });
 
     // get JWT Token
