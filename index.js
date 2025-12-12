@@ -84,7 +84,15 @@ async function run() {
       res.status(201).json(result);
     });
 
-    app.delete("/users/:id", async (req, res) => {
+    app.patch("/users/:id", verifyJWTToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updatedDoc = { $set: req.body };
+      const result = await usersCollection.updateOne(query, updatedDoc);
+      res.status(200).json(result);
+    });
+
+    app.delete("/users/:id", verifyJWTToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await usersCollection.deleteOne(query);
