@@ -72,6 +72,23 @@ async function run() {
       res.status(200).json(result);
     });
 
+    app.get("/users/:email/role", verifyJWTToken, async (req, res) => {
+      const tokenEmail = req.user?.email;
+      const email = req.params.email;
+      const query = { email: email };
+      if (tokenEmail !== email) {
+        return res.status(403).send({
+          success: false,
+          message: "Forbidden: Access denied. Email mismatch.",
+        });
+      }
+      const result = await usersCollection.findOne(query, {
+        $project: { role: 1 },
+      });
+
+      res.status(200).send({ role: result?.role } || "student");
+    });
+
     app.post("/users", async (req, res) => {
       const userInfo = req.body;
       userInfo.role = "student";
@@ -125,7 +142,7 @@ async function run() {
     });
 
     //? scholarships api
-    app.get("/scholarships", async (req, res) => {
+    app.get("/scholarships", verifyJWTToken, async (req, res) => {
       const {
         limit = 0,
         schCat = "",
