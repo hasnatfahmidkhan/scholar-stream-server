@@ -54,8 +54,21 @@ async function run() {
     const scholarshipsCollection = db.collection("scholarships");
     const applicationsCollection = db.collection("applications");
 
+    // middle for admin & moderator
+    const verifyAdmin = async (req, res, next) => {
+      const tokenEmail = req.user?.email;
+      const query = { email: tokenEmail };
+      const result = await usersCollection.findOne(query);
+      if (!result) {
+        return res.status(403).json({ message: "Forbidden access denied" });
+      }
+      if (result.role === "admin") {
+        next();
+      }
+    };
+
     //? users api
-    app.get("/users", verifyJWTToken, async (req, res) => {
+    app.get("/users", verifyJWTToken, verifyAdmin, async (req, res) => {
       const { search = "", filter = "" } = req.query;
       const query = {};
       if (search) {
