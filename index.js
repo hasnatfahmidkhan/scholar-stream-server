@@ -342,6 +342,38 @@ async function run() {
         updatedDoc,
         options
       );
+
+      const ratingResult = await reviewsCollection
+        .aggregate([
+          {
+            $match: { scholarshipId: reviewsInfo.scholarshipId },
+          },
+          {
+            $group: {
+              _id: "$scholarshipId",
+              averageRating: { $avg: "$rating" },
+              totalReview: { $sum: 1 },
+            },
+          },
+        ])
+        .toArray();
+
+      if (ratingResult.length > 0) {
+        const { averageRating, totalReview } = ratingResult[0];
+        const roundedRating = Math.round(averageRating / 5) * 5;
+        await scholarshipsCollection.updateOne(
+          {
+            _id: new ObjectId(reviewsInfo.scholarshipId),
+          },
+          {
+            $set: {
+              ratings: roundedRating,
+              totalReview: totalReview,
+            },
+          }
+        );
+      }
+
       res.status(200).json(result);
     });
 
