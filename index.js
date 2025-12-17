@@ -53,6 +53,7 @@ async function run() {
     const usersCollection = db.collection("users");
     const scholarshipsCollection = db.collection("scholarships");
     const applicationsCollection = db.collection("applications");
+    const reviewsCollection = db.collection("reviews");
 
     // middle for admin & moderator
     const verifyAdmin = async (req, res, next) => {
@@ -309,6 +310,31 @@ async function run() {
         appsByCategory,
         appsByUniversity,
       });
+    });
+
+    // Review API
+    app.post("/reviews", async (req, res) => {
+      const reviewsInfo = req.body;
+      const query = {
+        email: reviewsInfo.email,
+        scholarshipId: reviewsInfo.scholarshipId,
+      };
+      const updatedDoc = {
+        $set: {
+          ...reviewsInfo,
+          updatedDate: new Date().toISOString(),
+        },
+        $setOnInsert: {
+          createdAt: new Date().toISOString(),
+        },
+      };
+      const options = { upsert: true };
+      const result = await reviewsCollection.updateOne(
+        query,
+        updatedDoc,
+        options
+      );
+      res.status(200).json(result);
     });
 
     //! payment api
