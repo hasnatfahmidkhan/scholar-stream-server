@@ -346,6 +346,23 @@ async function run() {
     });
 
     // wishlist api
+    app.get(
+      "/wishlists/check/:scholarshipId",
+      verifyJWTToken,
+      async (req, res) => {
+        const { scholarshipId } = req.params;
+        const { email } = req.query;
+        const existingItem = await wishlistsCollection.findOne({
+          scholarshipId,
+          userEmail: email,
+        });
+
+        res.status(200).json({
+          isSaved: !!existingItem,
+        });
+      }
+    );
+
     app.post("/wishlists", verifyJWTToken, async (req, res) => {
       const wishlistInfo = req.body;
       wishlistInfo.createdAt = new Date().toISOString();
