@@ -313,6 +313,13 @@ async function run() {
     });
 
     // Review API
+    app.get("/reviews/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { scholarshipId: id };
+      const result = await reviewsCollection.find(query).toArray();
+      res.status(200).json(result);
+    });
+
     app.post("/reviews", async (req, res) => {
       const reviewsInfo = req.body;
       const query = {
