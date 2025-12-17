@@ -158,6 +158,7 @@ async function run() {
     app.get("/scholarships", verifyJWTToken, async (req, res) => {
       const {
         limit = 0,
+        page = 1,
         schCat = "",
         subCat = "",
         loc = "",
@@ -165,7 +166,7 @@ async function run() {
         sort = "",
       } = req.query;
       let sortFilter = { applicationFees: 1, scholarshipPostDate: -1 };
-
+      const skip = (page - 1) * limit;
       const query = {};
       if (sort === "asc") {
         sortFilter = { applicationFees: 1 };
@@ -190,13 +191,14 @@ async function run() {
           { degree: { $regex: search, $options: "i" } },
         ];
       }
-
+      const totalScholaships = await scholarshipsCollection.countDocuments();
       const result = await scholarshipsCollection
         .find(query)
         .limit(Number(limit))
+        .skip(Number(skip))
         .sort(sortFilter)
         .toArray();
-      res.status(200).json(result);
+      res.status(200).json({ scholarships: result, totalScholaships });
     });
 
     app.get("/scholarship/:id", async (req, res) => {
