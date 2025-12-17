@@ -69,7 +69,8 @@ async function run() {
 
     //? users api
     app.get("/users", verifyJWTToken, verifyAdmin, async (req, res) => {
-      const { search = "", filter = "" } = req.query;
+      const { search = "", filter = "", limit = 0, page = 1 } = req.query;
+      const skip = (page - 1) * limit;
       const query = {};
       if (search) {
         query.$or = [
@@ -81,8 +82,12 @@ async function run() {
       if (filter) {
         query.role = filter;
       }
-      const result = await usersCollection.find(query).toArray();
-      res.status(200).json(result);
+      const totalUsers = await usersCollection.countDocuments();
+      const result = await usersCollection
+        .find(query)
+        .skip(Number(skip))
+        .toArray();
+      res.status(200).json({ users: result, totalUsers });
     });
 
     app.get("/users/:email/role", verifyJWTToken, async (req, res) => {
