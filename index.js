@@ -54,6 +54,7 @@ async function run() {
     const scholarshipsCollection = db.collection("scholarships");
     const applicationsCollection = db.collection("applications");
     const reviewsCollection = db.collection("reviews");
+    const wishlistsCollection = db.collection("wishlists");
 
     // middle for admin & moderator
     const verifyAdmin = async (req, res, next) => {
@@ -313,14 +314,14 @@ async function run() {
     });
 
     // Review API
-    app.get("/reviews/:id", async (req, res) => {
+    app.get("/reviews/:id", verifyJWTToken, async (req, res) => {
       const id = req.params.id;
       const query = { scholarshipId: id };
       const result = await reviewsCollection.find(query).toArray();
       res.status(200).json(result);
     });
 
-    app.post("/reviews", async (req, res) => {
+    app.post("/reviews", verifyJWTToken, async (req, res) => {
       const reviewsInfo = req.body;
       const query = {
         email: reviewsInfo.email,
@@ -342,6 +343,24 @@ async function run() {
         options
       );
       res.status(200).json(result);
+    });
+
+    // wishlist api
+    app.post("/wishlists", verifyJWTToken, async (req, res) => {
+      const wishlistInfo = req.body;
+      wishlistInfo.createdAt = new Date().toISOString();
+      const query = {
+        scholarshipId: wishlistInfo?.scholarshipId,
+        userEmail: wishlistInfo?.userEmail,
+      };
+      const isExits = await wishlistsCollection.findOne(query);
+      if (isExits) {
+        return res
+          .status(200)
+          .json({ success: false, message: "already in wishlist" });
+      }
+      const result = await wishlistsCollection.insertOne(wishlistInfo);
+      res.status(201).json(result);
     });
 
     //! payment api
