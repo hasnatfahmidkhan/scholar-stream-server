@@ -142,6 +142,7 @@ async function run() {
       res.status(200).json(result);
     });
 
+    // api for delete user
     app.delete("/users/:id", verifyJWTToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -175,7 +176,8 @@ async function run() {
     });
 
     //? scholarships api
-    app.get("/scholarships", verifyJWTToken, async (req, res) => {
+    // api for all scholaships
+    app.get("/scholarships", async (req, res) => {
       const {
         limit = 0,
         page = 1,
@@ -221,27 +223,44 @@ async function run() {
       res.status(200).json({ scholarships: result, totalScholaships });
     });
 
-    app.get("/scholarship/:id", async (req, res) => {
+    // api for scholarship details
+    app.get("/scholarship/:id", verifyJWTToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await scholarshipsCollection.findOne(query);
       res.status(200).json(result);
     });
 
-    app.post("/add-scholarship", verifyJWTToken, async (req, res) => {
-      const scholarshipInfo = req.body;
-      const result = await scholarshipsCollection.insertOne(scholarshipInfo);
-      res.status(201).json(result);
-    });
+    // api for scholarship add
+    app.post(
+      "/add-scholarship",
+      verifyJWTToken,
+      verifyAdmin,
+      async (req, res) => {
+        const scholarshipInfo = req.body;
+        const result = await scholarshipsCollection.insertOne(scholarshipInfo);
+        res.status(201).json(result);
+      }
+    );
 
-    app.patch("/scholarship/:id", verifyJWTToken, async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const updatedDoc = { $set: req.body };
-      const result = await scholarshipsCollection.updateOne(query, updatedDoc);
-      res.status(200).json(result);
-    });
+    // api for scholarship edit
+    app.patch(
+      "/scholarship/:id",
+      verifyJWTToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const updatedDoc = { $set: req.body };
+        const result = await scholarshipsCollection.updateOne(
+          query,
+          updatedDoc
+        );
+        res.status(200).json(result);
+      }
+    );
 
+    // api for scholarship delete
     app.delete("/scholarship/:id", verifyJWTToken, async (req, res) => {
       const id = req.params.id;
       const { adminEmail } = req.query;
@@ -258,6 +277,7 @@ async function run() {
     });
 
     //? Application api
+    // api for get applications for moderator
     app.get(
       "/applications",
       verifyJWTToken,
@@ -305,6 +325,7 @@ async function run() {
       }
     );
 
+    // api for get applications details
     app.get("/applications/:id", verifyJWTToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -312,6 +333,7 @@ async function run() {
       res.status(200).json(result);
     });
 
+    // api for update application details
     app.patch("/applications/:id", verifyJWTToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -321,6 +343,7 @@ async function run() {
       res.status(200).json(result);
     });
 
+    // api for get applications by specific user
     app.get("/applications/:email/byUser", verifyJWTToken, async (req, res) => {
       const email = req.params.email;
       const query = { userEmail: email };
@@ -328,6 +351,7 @@ async function run() {
       res.status(200).json(result);
     });
 
+    // api for update application status
     app.patch(
       "/applications/:id",
       verifyJWTToken,
@@ -346,6 +370,7 @@ async function run() {
       }
     );
 
+    // api for application feedback
     app.patch(
       "/applications/feedback/:id",
       verifyJWTToken,
@@ -364,6 +389,7 @@ async function run() {
       }
     );
 
+    // api for delete applicatoin
     app.delete("/applications/:id", verifyJWTToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id), applicationStatus: "pending" };
@@ -372,11 +398,13 @@ async function run() {
     });
 
     //? Reviews api
+    // api for get reviews
     app.get("/reviews", verifyJWTToken, verifyModerator, async (req, res) => {
       const result = await reviewsCollection.find().toArray();
       res.status(200).json(result);
     });
 
+    // api for get reviews by user
     app.get("/reviews/user/:email", verifyJWTToken, async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
@@ -384,6 +412,72 @@ async function run() {
       res.status(200).json(result);
     });
 
+    // api for review details
+    app.get("/reviews/:id", verifyJWTToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { scholarshipId: id };
+      const result = await reviewsCollection.find(query).toArray();
+      res.status(200).json(result);
+    });
+
+    // api for post reviews
+    app.post("/reviews", verifyJWTToken, async (req, res) => {
+      const reviewsInfo = req.body;
+      const query = {
+        email: reviewsInfo.email,
+        scholarshipId: reviewsInfo.scholarshipId,
+      };
+      const updatedDoc = {
+        $set: {
+          ...reviewsInfo,
+          updatedDate: new Date().toISOString(),
+        },
+        $setOnInsert: {
+          createdAt: new Date().toISOString(),
+        },
+      };
+      const options = { upsert: true };
+      const result = await reviewsCollection.updateOne(
+        query,
+        updatedDoc,
+        options
+      );
+
+      const ratingResult = await reviewsCollection
+        .aggregate([
+          {
+            $match: { scholarshipId: reviewsInfo.scholarshipId },
+          },
+          {
+            $group: {
+              _id: "$scholarshipId",
+              averageRating: { $avg: "$rating" },
+              totalReview: { $sum: 1 },
+            },
+          },
+        ])
+        .toArray();
+
+      if (ratingResult.length > 0) {
+        const { averageRating, totalReview } = ratingResult[0];
+        const roundedRating = Math.round(averageRating / 5) * 5;
+        await scholarshipsCollection.updateOne(
+          {
+            _id: new ObjectId(reviewsInfo.scholarshipId),
+          },
+          {
+            $set: {
+              ratings: roundedRating,
+              totalReview: totalReview,
+            },
+          }
+        );
+      }
+
+      res.status(200).json(result);
+    });
+
+    // api for delete reviews
     app.delete("/reviews/:id", verifyJWTToken, async (req, res) => {
       const id = req.params.id;
       const result = await reviewsCollection.deleteOne({
@@ -393,6 +487,7 @@ async function run() {
     });
 
     //? Analytics page api
+    // api for admin analytics
     app.get("/analytics", async (req, res) => {
       const totalScholaships = await scholarshipsCollection.countDocuments();
       const totalUsers = await usersCollection.countDocuments();
@@ -461,71 +556,8 @@ async function run() {
       });
     });
 
-    // Review API
-    app.get("/reviews/:id", verifyJWTToken, async (req, res) => {
-      const id = req.params.id;
-      const query = { scholarshipId: id };
-      const result = await reviewsCollection.find(query).toArray();
-      res.status(200).json(result);
-    });
-
-    app.post("/reviews", verifyJWTToken, async (req, res) => {
-      const reviewsInfo = req.body;
-      const query = {
-        email: reviewsInfo.email,
-        scholarshipId: reviewsInfo.scholarshipId,
-      };
-      const updatedDoc = {
-        $set: {
-          ...reviewsInfo,
-          updatedDate: new Date().toISOString(),
-        },
-        $setOnInsert: {
-          createdAt: new Date().toISOString(),
-        },
-      };
-      const options = { upsert: true };
-      const result = await reviewsCollection.updateOne(
-        query,
-        updatedDoc,
-        options
-      );
-
-      const ratingResult = await reviewsCollection
-        .aggregate([
-          {
-            $match: { scholarshipId: reviewsInfo.scholarshipId },
-          },
-          {
-            $group: {
-              _id: "$scholarshipId",
-              averageRating: { $avg: "$rating" },
-              totalReview: { $sum: 1 },
-            },
-          },
-        ])
-        .toArray();
-
-      if (ratingResult.length > 0) {
-        const { averageRating, totalReview } = ratingResult[0];
-        const roundedRating = Math.round(averageRating / 5) * 5;
-        await scholarshipsCollection.updateOne(
-          {
-            _id: new ObjectId(reviewsInfo.scholarshipId),
-          },
-          {
-            $set: {
-              ratings: roundedRating,
-              totalReview: totalReview,
-            },
-          }
-        );
-      }
-
-      res.status(200).json(result);
-    });
-
     // wishlist api
+    // api for get wishlists
     app.get("/wishlists", verifyJWTToken, async (req, res) => {
       try {
         const email = req.query.email;
@@ -593,6 +625,7 @@ async function run() {
       }
     });
 
+    // api for get wishlist status
     app.get(
       "/wishlists/check/:scholarshipId",
       verifyJWTToken,
@@ -614,6 +647,7 @@ async function run() {
       }
     );
 
+    // api for delete wishlist
     app.delete("/wishlists/:id", verifyJWTToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -621,6 +655,7 @@ async function run() {
       res.status(200).json(result);
     });
 
+    // api for add wishlist
     app.post("/wishlists", verifyJWTToken, async (req, res) => {
       const wishlistInfo = req.body;
       wishlistInfo.createdAt = new Date().toISOString();
@@ -639,6 +674,7 @@ async function run() {
     });
 
     //! payment api
+    // api for create checkout session with add application info 
     app.post("/create-checkout-session", verifyJWTToken, async (req, res) => {
       const {
         scholarshipId,
@@ -764,6 +800,7 @@ async function run() {
       res.json({ url: session.url });
     });
 
+    // api for check payment status and update payment status 
     app.patch("/payment/success", verifyJWTToken, async (req, res) => {
       const { sessionId } = req.body;
 
