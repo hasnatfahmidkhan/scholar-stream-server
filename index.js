@@ -324,6 +324,22 @@ async function run() {
       }
     );
 
+    app.patch(
+      "/applications/feedback/:id",
+      verifyJWTToken,
+      verifyModerator,
+      async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const updatedDoc = { $set: req.body };
+        const result = await applicationsCollection.updateOne(
+          query,
+          updatedDoc
+        );
+        res.status(200).json(result);
+      }
+    );
+
     //? Analytics page api
     app.get("/analytics", async (req, res) => {
       const totalScholaships = await scholarshipsCollection.countDocuments();
