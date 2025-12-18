@@ -4,7 +4,6 @@ const express = require("express");
 const cors = require("cors");
 const { MongoClient, ObjectId, ServerApiVersion } = require("mongodb");
 const Stripe = require("stripe");
-const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 const app = express();
@@ -527,16 +526,85 @@ async function run() {
     });
 
     // wishlist api
+    app.get("/wishlists", verifyJWTToken, async (req, res) => {
+      try {
+        const email = req.query.email;
+
+        // Security check: Ensure user can only access their own data
+        if (req.user.email !== email) {
+          return res.status(403).send({ message: "Forbidden access" });
+        }
+
+        const result = await wishlistsCollection
+          .aggregate([
+            // 1. Match wishlist items for this user
+            {
+              $match: { userEmail: email },
+            },
+            // 2. Convert scholarshipId string to ObjectId (if stored as string in wishlist)
+            {
+              $addFields: {
+                scholarshipObjectId: { $toObjectId: "$scholarshipId" },
+              },
+            },
+            // 3. Lookup (Join) with scholarships collection
+            {
+              $lookup: {
+                from: "scholarships",
+                localField: "scholarshipObjectId",
+                foreignField: "_id",
+                as: "scholarshipDetails",
+              },
+            },
+            // 4. Unwind the array (because lookup returns an array)
+            {
+              $unwind: "$scholarshipDetails",
+            },
+            // 5. Project (Select) the fields you want to send to frontend
+            {
+              $project: {
+                _id: 1, // Wishlist ID (needed for delete)
+                scholarshipId: 1,
+                userEmail: 1,
+                // Fields from the joined scholarship collection
+                universityName: "$scholarshipDetails.universityName",
+                scholarshipName: "$scholarshipDetails.scholarshipName",
+                universityImage: "$scholarshipDetails.universityImage",
+                scholarshipCategory: "$scholarshipDetails.scholarshipCategory",
+                degree: "$scholarshipDetails.degree",
+                applicationFees: "$scholarshipDetails.applicationFees",
+                serviceCharge: "$scholarshipDetails.serviceCharge",
+                universityLocation: {
+                  $concat: [
+                    "$scholarshipDetails.universityCity",
+                    ", ",
+                    "$scholarshipDetails.universityCountry",
+                  ],
+                },
+              },
+            },
+          ])
+          .toArray();
+
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Internal server error" });
+      }
+    });
+
     app.get(
       "/wishlists/check/:scholarshipId",
       verifyJWTToken,
       async (req, res) => {
         const { scholarshipId } = req.params;
         const { email } = req.query;
-        const existingItem = await wishlistsCollection.findOne({
-          scholarshipId,
-          userEmail: email,
-        });
+        const existingItem = await wishlistsCollection
+          .find({
+            scholarshipId,
+            userEmail: email,
+          })
+          .toArray();
 
         res.status(200).json({
           isSaved: !!existingItem,
