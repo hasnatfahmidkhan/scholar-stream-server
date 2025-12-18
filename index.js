@@ -599,16 +599,18 @@ async function run() {
       async (req, res) => {
         const { scholarshipId } = req.params;
         const { email } = req.query;
-        const existingItem = await wishlistsCollection
-          .find({
-            scholarshipId,
-            userEmail: email,
-          })
-          .toArray();
-
-        res.status(200).json({
-          isSaved: !!existingItem,
+        const result = await wishlistsCollection.findOne({
+          scholarshipId,
+          userEmail: email,
         });
+
+        if (result) {
+          // Document found
+          res.send({ isSaved: true, id: result._id });
+        } else {
+          // Document NOT found - Return null ID
+          res.send({ isSaved: false, id: null });
+        }
       }
     );
 
