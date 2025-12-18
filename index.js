@@ -378,18 +378,20 @@ async function run() {
       res.status(200).json(result);
     });
 
-    app.delete(
-      "/reviews/:id",
-      verifyJWTToken,
-      verifyModerator,
-      async (req, res) => {
-        const id = req.params.id;
-        const result = await reviewsCollection.deleteOne({
-          _id: new ObjectId(id),
-        });
-        res.status(200).json(result);
-      }
-    );
+    app.get("/reviews/user/:email", verifyJWTToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const result = await reviewsCollection.find(query).toArray();
+      res.status(200).json(result);
+    });
+
+    app.delete("/reviews/:id", verifyJWTToken, async (req, res) => {
+      const id = req.params.id;
+      const result = await reviewsCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
+      res.status(200).json(result);
+    });
 
     //? Analytics page api
     app.get("/analytics", async (req, res) => {
