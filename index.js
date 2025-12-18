@@ -16,7 +16,11 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+      process.env.DOMAIN_URL,
+    ],
     credentials: true,
   })
 );
@@ -674,7 +678,7 @@ async function run() {
     });
 
     //! payment api
-    // api for create checkout session with add application info 
+    // api for create checkout session with add application info
     app.post("/create-checkout-session", verifyJWTToken, async (req, res) => {
       const {
         scholarshipId,
@@ -800,7 +804,7 @@ async function run() {
       res.json({ url: session.url });
     });
 
-    // api for check payment status and update payment status 
+    // api for check payment status and update payment status
     app.patch("/payment/success", verifyJWTToken, async (req, res) => {
       const { sessionId } = req.body;
 
