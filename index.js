@@ -365,6 +365,13 @@ async function run() {
       }
     );
 
+    app.delete("/applications/:id", verifyJWTToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id), applicationStatus: "pending" };
+      const result = await applicationsCollection.deleteOne(query);
+      res.status(200).json(result);
+    });
+
     //? Reviews api
     app.get("/reviews", verifyJWTToken, verifyModerator, async (req, res) => {
       const result = await reviewsCollection.find().toArray();
