@@ -612,6 +612,13 @@ async function run() {
       }
     );
 
+    app.delete("/wishlists/:id", verifyJWTToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await wishlistsCollection.deleteOne(query);
+      res.status * (200).json(result);
+    });
+
     app.post("/wishlists", verifyJWTToken, async (req, res) => {
       const wishlistInfo = req.body;
       wishlistInfo.createdAt = new Date().toISOString();
