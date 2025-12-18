@@ -306,8 +306,24 @@ async function run() {
       }
     );
 
-    app.get("/applications/byUser", verifyJWTToken, async (req, res) => {
-      const email = req.query.email;
+    app.get("/applications/:id", verifyJWTToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await applicationsCollection.findOne(query);
+      res.status(200).json(result);
+    });
+
+    app.patch("/applications/:id", verifyJWTToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updatedDate = req.body;
+      const updatedDoc = { $set: updatedDate };
+      const result = await applicationsCollection.updateOne(query, updatedDoc);
+      res.status(200).json(result);
+    });
+
+    app.get("/applications/:email/byUser", verifyJWTToken, async (req, res) => {
+      const email = req.params.email;
       const query = { userEmail: email };
       const result = await applicationsCollection.find(query).toArray();
       res.status(200).json(result);
