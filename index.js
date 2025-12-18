@@ -306,6 +306,13 @@ async function run() {
       }
     );
 
+    app.get("/applications/byUser", verifyJWTToken, async (req, res) => {
+      const email = req.query.email;
+      const query = { userEmail: email };
+      const result = await applicationsCollection.find(query).toArray();
+      res.status(200).json(result);
+    });
+
     app.patch(
       "/applications/:id",
       verifyJWTToken,
@@ -332,9 +339,11 @@ async function run() {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
         const updatedDoc = { $set: req.body };
+        const options = { upsert: true };
         const result = await applicationsCollection.updateOne(
           query,
-          updatedDoc
+          updatedDoc,
+          options
         );
         res.status(200).json(result);
       }
@@ -530,16 +539,26 @@ async function run() {
     //! payment api
     app.post("/create-checkout-session", verifyJWTToken, async (req, res) => {
       const {
-        totalPrice,
-        userName,
-        universityName,
-        universityImage,
         scholarshipId,
         scholarshipName,
+        universityImage,
+        userName,
+        universityName,
+        universityCity,
+        universityCountry,
         scholarshipCategory,
+        subjectCategory,
         degree,
         applicationFees,
         serviceCharge,
+        totalPrice,
+        phone,
+        photoURL,
+        address,
+        gender,
+        studyGap,
+        sscResult,
+        hscResult,
       } = req.body;
 
       const tokenEmail = req.user.email;
@@ -585,11 +604,21 @@ async function run() {
 
       // if user not apply then insert data
       const applicationInfo = {
+        phone,
+        photoURL,
+        address,
+        gender,
+        studyGap,
+        sscResult,
+        hscResult,
         scholarshipId,
         userEmail,
         userName,
         universityName,
+        universityCity,
+        universityCountry,
         scholarshipCategory,
+        subjectCategory,
         degree,
         applicationFees,
         serviceCharge,
