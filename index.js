@@ -69,6 +69,19 @@ async function run() {
       }
     };
 
+    const verifyModerator = async (req, res, next) => {
+      const tokenEmail = req.user?.email;
+      const query = { email: tokenEmail };
+      const result = await usersCollection.findOne(query);
+
+      if (!result) {
+        return res.status(403).json({ message: "Forbidden access denied" });
+      }
+      if (result.role === "moderator") {
+        next();
+      }
+    };
+
     //? users api
     app.get("/users", verifyJWTToken, verifyAdmin, async (req, res) => {
       const { search = "", filter = "", limit = 0, page = 1 } = req.query;
@@ -87,6 +100,7 @@ async function run() {
       const totalUsers = await usersCollection.countDocuments();
       const result = await usersCollection
         .find(query)
+        .limit(Number(limit))
         .skip(Number(skip))
         .toArray();
       res.status(200).json({ users: result, totalUsers });
@@ -243,6 +257,22 @@ async function run() {
       const result = await scholarshipsCollection.deleteOne(query);
       res.status(200).json(result);
     });
+
+    //? Application api
+    app.get(
+      "/applications",
+      verifyJWTToken,
+      verifyModerator,
+      async (req, res) => {
+        const { email } = req.query;
+        const tokenEmail = req?.user?.email;
+        if (email !== tokenEmail) {
+          return res.status(403).json({ message: "access forbidden" });
+        }
+        const result = await applicationsCollection.find().toArray();
+        res.status(200).json(result);
+      }
+    );
 
     //? Analytics page api
     app.get("/analytics", async (req, res) => {
