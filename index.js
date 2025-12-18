@@ -269,7 +269,57 @@ async function run() {
         if (email !== tokenEmail) {
           return res.status(403).json({ message: "access forbidden" });
         }
-        const result = await applicationsCollection.find().toArray();
+        const result = await applicationsCollection
+          .aggregate([
+            {
+              $addFields: {
+                statusPriority: {
+                  $switch: {
+                    branches: [
+                      {
+                        case: { $eq: ["$applicationStatus", "pending"] },
+                        then: 0,
+                      },
+                      {
+                        case: { $eq: ["$applicationStatus", "processing"] },
+                        then: 1,
+                      },
+                      {
+                        case: { $eq: ["$applicationStatus", "completed"] },
+                        then: 2,
+                      },
+                      {
+                        case: { $eq: ["$applicationStatus", "rejected"] },
+                        then: 3,
+                      },
+                    ],
+                    default: 99,
+                  },
+                },
+              },
+            },
+            { $sort: { statusPriority: 1 } },
+          ])
+          .toArray();
+
+        res.status(200).json(result);
+      }
+    );
+
+    app.patch(
+      "/applications/:id",
+      verifyJWTToken,
+      verifyModerator,
+      async (req, res) => {
+        const applicationStatus = req.body;
+        const id = req.params.id;
+
+        const query = { _id: new ObjectId(id) };
+        const updatedDoc = { $set: applicationStatus };
+        const result = await applicationsCollection.updateOne(
+          query,
+          updatedDoc
+        );
         res.status(200).json(result);
       }
     );
