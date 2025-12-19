@@ -1,5 +1,5 @@
-require("dotenv").config();
-
+const dotenv = require("dotenv");
+dotenv.config();
 const express = require("express");
 const cors = require("cors");
 const { MongoClient, ObjectId, ServerApiVersion } = require("mongodb");
@@ -802,6 +802,68 @@ async function run() {
       });
 
       res.json({ url: session.url });
+    });
+
+    // api for retry payment from dashboard
+    app.post("/retry-payment/:id", verifyJWTToken, async (req, res) => {
+      const id = req.params.id;
+      const tokenEmail = req.user.email;
+
+      try {
+        const query = { _id: new ObjectId(id) };
+        const application = await applicationsCollection.findOne(query);
+        console.log(application);
+
+        // 1. Check if application exists
+        if (!application) {
+          return res.status(404).send({ message: "Application not found" });
+        }
+
+        // 2. Verify user ownership
+        if (application.userEmail !== tokenEmail) {
+          return res.status(403).send({ message: "Forbidden Access" });
+        }
+
+        // 4. Create Stripe Session
+        // Note: We use the data already saved in the database
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ["card"],
+          line_items: [
+            {
+              price_data: {
+                currency: "usd",
+                product_data: {
+                  name: `Application for: ${application.scholarshipName}`,
+                  description: `University: ${application.universityName}`,
+                  // Ensure universityImage is stored in your DB application object,
+                  // otherwise fetch it from scholarshipsCollection or omit images
+                  images: [application.universityImage],
+                },
+                unit_amount: Math.round(
+                  (application.applicationFees + application.serviceCharge) *
+                    100
+                ),
+              },
+              quantity: 1,
+            },
+          ],
+          customer_email: application.userEmail,
+          mode: "payment",
+          metadata: {
+            applicationId: id,
+            scholarshipId: application.scholarshipId,
+            userEmail: application.userEmail,
+          },
+          // Redirect URLs
+          success_url: `${process.env.DOMAIN_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${process.env.DOMAIN_URL}/payment/fail?scholarshipName=${application.scholarshipName}`,
+        });
+
+        res.json({ url: session.url });
+      } catch (error) {
+        // console.error("Payment Error:", error);
+        res.status(500).send({ message: "Internal Server Error" });
+      }
     });
 
     // api for check payment status and update payment status
