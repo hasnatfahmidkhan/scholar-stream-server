@@ -767,6 +767,7 @@ async function run() {
         userName,
         universityName,
         universityCity,
+        universityImage,
         universityCountry,
         scholarshipCategory,
         subjectCategory,
@@ -821,7 +822,6 @@ async function run() {
       try {
         const query = { _id: new ObjectId(id) };
         const application = await applicationsCollection.findOne(query);
-        console.log(application);
 
         // 1. Check if application exists
         if (!application) {
@@ -844,8 +844,6 @@ async function run() {
                 product_data: {
                   name: `Application for: ${application.scholarshipName}`,
                   description: `University: ${application.universityName}`,
-                  // Ensure universityImage is stored in your DB application object,
-                  // otherwise fetch it from scholarshipsCollection or omit images
                   images: [application.universityImage],
                 },
                 unit_amount: Math.round(
