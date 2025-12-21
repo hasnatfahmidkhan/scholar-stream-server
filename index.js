@@ -19,6 +19,7 @@ app.use(
     origin: [
       "http://localhost:5173",
       "http://localhost:5174",
+      "https://scholarshipstream.firebaseapp.com",
       process.env.DOMAIN_URL,
     ],
     credentials: true,
@@ -232,7 +233,15 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await scholarshipsCollection.findOne(query);
-      res.status(200).json(result);
+
+      const recomended = await scholarshipsCollection
+        .find({
+          scholarshipCategory: result.scholarshipCategory,
+          _id: { $ne: new ObjectId(id) },
+        })
+        .limit(3)
+        .toArray();
+      res.status(200).json({ details: result, recomended });
     });
 
     // api for scholarship add
