@@ -768,6 +768,7 @@ async function run() {
         universityName,
         universityCity,
         universityImage,
+        scholarshipName,
         universityCountry,
         scholarshipCategory,
         subjectCategory,
