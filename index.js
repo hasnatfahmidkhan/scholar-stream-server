@@ -23,7 +23,7 @@ app.use(
       process.env.DOMAIN_URL,
     ],
     credentials: true,
-  })
+  }),
 );
 const uri = process.env.MONGODB_URL;
 
@@ -69,6 +69,7 @@ async function run() {
         return res.status(403).json({ message: "Forbidden access denied" });
       }
       if (result.role === "admin") {
+        req.decoded = result?.email;
         next();
       }
     };
@@ -139,20 +140,66 @@ async function run() {
       res.status(201).json(result);
     });
 
-    app.patch("/users/:id", verifyJWTToken, async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const updatedDoc = { $set: req.body };
-      const result = await usersCollection.updateOne(query, updatedDoc);
-      res.status(200).json(result);
-    });
+    // A. CHANGE ROLE (Make Admin/Moderator)
+    app.patch(
+      "/users/role/:id",
+      verifyJWTToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const { role } = req.body;
+        const requesterEmail = req.decoded.email; // The admin doing the action
 
-    // api for delete user
-    app.delete("/users/:id", verifyJWTToken, async (req, res) => {
+        const query = { _id: new ObjectId(id) };
+        const targetUser = await usersCollection.findOne(query);
+
+        if (!targetUser) {
+          return res.status(404).send({ message: "User not found" });
+        }
+
+        // 🔒 SECURITY CHECK: The "Is Protected" Flag
+        // If the user has isProtected: true, NO ONE can touch them.
+        if (targetUser.isProtected) {
+          return res
+            .status(403)
+            .send({ message: "Action Forbidden: This user is Protected." });
+        }
+
+        // 🛡️ UX CHECK: Prevent Self-Demotion (Optional but recommended)
+        if (targetUser.email === requesterEmail) {
+          return res
+            .status(403)
+            .send({ message: "You cannot change your own role." });
+        }
+
+        const updateDoc = {
+          $set: { role: role },
+        };
+        const result = await usersCollection.updateOne(query, updateDoc);
+        res.send(result);
+      },
+    );
+
+    // B. DELETE USER
+    app.delete("/users/:id", verifyJWTToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
+
       const query = { _id: new ObjectId(id) };
+      const targetUser = await usersCollection.findOne(query);
+
+      if (!targetUser) {
+        return res.status(404).send({ message: "User not found" });
+      }
+
+      // 🔒 SECURITY CHECK: The "Is Protected" Flag
+      if (targetUser.isProtected) {
+        return res.status(403).send({
+          message: "Action Forbidden: Cannot delete a Protected User.",
+        });
+      }
+
       const result = await usersCollection.deleteOne(query);
-      res.status(200).json(result);
+      res.send(result);
     });
 
     //? get JWT Token
@@ -253,7 +300,7 @@ async function run() {
         const scholarshipInfo = req.body;
         const result = await scholarshipsCollection.insertOne(scholarshipInfo);
         res.status(201).json(result);
-      }
+      },
     );
 
     // api for scholarship edit
@@ -267,10 +314,10 @@ async function run() {
         const updatedDoc = { $set: req.body };
         const result = await scholarshipsCollection.updateOne(
           query,
-          updatedDoc
+          updatedDoc,
         );
         res.status(200).json(result);
-      }
+      },
     );
 
     // api for scholarship delete
@@ -335,7 +382,7 @@ async function run() {
           .toArray();
 
         res.status(200).json(result);
-      }
+      },
     );
 
     // api for get applications details
@@ -377,10 +424,10 @@ async function run() {
         const updatedDoc = { $set: applicationStatus };
         const result = await applicationsCollection.updateOne(
           query,
-          updatedDoc
+          updatedDoc,
         );
         res.status(200).json(result);
-      }
+      },
     );
 
     // api for application feedback
@@ -396,10 +443,10 @@ async function run() {
         const result = await applicationsCollection.updateOne(
           query,
           updatedDoc,
-          options
+          options,
         );
         res.status(200).json(result);
-      }
+      },
     );
 
     // api for delete applicatoin
@@ -453,7 +500,7 @@ async function run() {
       const result = await reviewsCollection.updateOne(
         query,
         updatedDoc,
-        options
+        options,
       );
 
       const ratingResult = await reviewsCollection
@@ -483,7 +530,7 @@ async function run() {
               ratings: roundedRating,
               totalReview: totalReview,
             },
-          }
+          },
         );
       }
 
@@ -657,7 +704,7 @@ async function run() {
           // Document NOT found - Return null ID
           res.send({ isSaved: false, id: null });
         }
-      }
+      },
     );
 
     // api for delete wishlist
@@ -780,9 +827,8 @@ async function run() {
         applicationDate: new Date().toISOString(),
       };
 
-      const applicatioinResult = await applicationsCollection.insertOne(
-        applicationInfo
-      );
+      const applicatioinResult =
+        await applicationsCollection.insertOne(applicationInfo);
 
       // Create Stripe Session
       const session = await stripe.checkout.sessions.create({
@@ -849,7 +895,7 @@ async function run() {
                 },
                 unit_amount: Math.round(
                   (application.applicationFees + application.serviceCharge) *
-                    100
+                    100,
                 ),
               },
               quantity: 1,
@@ -913,7 +959,7 @@ async function run() {
 
           const applicationUpdate = await applicationsCollection.updateOne(
             query,
-            updatedDoc
+            updatedDoc,
           );
 
           if (applicationUpdate.modifiedCount) {
@@ -923,7 +969,7 @@ async function run() {
                 $inc: {
                   applicantNumber: 1,
                 },
-              }
+              },
             );
 
             const applicationInfo = await applicationsCollection.findOne(query);
