@@ -546,6 +546,28 @@ async function run() {
       res.status(200).json(result);
     });
 
+    // home stats api
+    //? Public Stats for Home Page (No Token Required)
+    app.get("/home-stats", async (req, res) => {
+      try {
+        const scholarshipCount = await scholarshipsCollection.countDocuments();
+        const applicationCount = await applicationsCollection.countDocuments();
+        const userCount = await usersCollection.countDocuments({
+          role: "student",
+        });
+        const reviewCount = await reviewsCollection.countDocuments();
+
+        res.send({
+          scholarshipCount,
+          applicationCount,
+          userCount,
+          reviewCount,
+        });
+      } catch (error) {
+        res.status(500).send({ message: "Error fetching stats" });
+      }
+    });
+
     //? Analytics page api
     // api for admin analytics
     app.get("/analytics", async (req, res) => {
