@@ -227,6 +227,39 @@ async function run() {
         .send({ success: true });
     });
 
+    //? Get unique universities for the "Trusted By" section
+    app.get("/top-universities", async (req, res) => {
+      try {
+        const result = await scholarshipsCollection
+          .aggregate([
+            {
+              $group: {
+                _id: "$universityName", // Group by Name (removes duplicates)
+                universityName: { $first: "$universityName" },
+                universityImage: { $first: "$universityImage" },
+                universityCountry: { $first: "$universityCountry" },
+                count: { $sum: 1 }, // Optional: Count how many scholarships they have
+              },
+            },
+            {
+              $project: {
+                _id: 0,
+                universityName: 1,
+                universityImage: 1,
+                universityCountry: 1,
+                count: 1,
+              },
+            },
+            { $limit: 20 }, // Don't fetch too many, just enough for the slider
+          ])
+          .toArray();
+
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Error fetching universities" });
+      }
+    });
+
     //? scholarships api
     // api for all scholaships
     app.get("/scholarships", async (req, res) => {
@@ -462,6 +495,21 @@ async function run() {
     app.get("/reviews", verifyJWTToken, verifyModerator, async (req, res) => {
       const result = await reviewsCollection.find().toArray();
       res.status(200).json(result);
+    });
+
+    //? Get Top Reviews for Home Page Success Stories
+    app.get("/top-reviews", async (req, res) => {
+      try {
+        const result = await reviewsCollection
+          .find({ rating: { $gte: 4 } }) // Get only good reviews (4 or 5 stars)
+          .sort({ reviewDate: -1 }) // Newest first
+          .limit(6) // Limit to 6
+          .toArray();
+
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ message: "Error fetching reviews" });
+      }
     });
 
     // api for get reviews by user
