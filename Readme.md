@@ -1,3 +1,5 @@
+***
+
 # ⚙️ ScholarStream Server
 
 [![Node.js](https://img.shields.io/badge/Runtime-Node.js-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -6,32 +8,33 @@
 [![JWT](https://img.shields.io/badge/Auth-JWT-000000?logo=jsonwebtokens&logoColor=white)](https://jwt.io/)
 [![Stripe](https://img.shields.io/badge/Payment-Stripe-008CDD?logo=stripe&logoColor=white)](https://stripe.com/)
 
-The robust backend infrastructure powering the **ScholarStream** platform. This RESTful API manages user authentication, scholarship data, application workflows, payment processing via Stripe, and administrative analytics.
+The robust backend infrastructure powering the **ScholarStream** platform. This RESTful API manages user authentication, scholarship data, application workflows, payment processing via Stripe, and administrative analytics using advanced MongoDB aggregations.
 
 ---
 
-## 🔗 Live API URL
-- **Base URL:** [https://scholar-stream-server-nine.vercel.app/](https://scholar-stream-server-nine.vercel.app/)
+## 🔗 Project Links
+- **Live API URL:** [https://scholar-stream-server-nine.vercel.app/](https://scholar-stream-server-nine.vercel.app/)
 - **Client Repository:** [ScholarStream Client](https://github.com/hasnatfahmidkhan/scholar-stream)
 
 ---
 
 ## 🛠️ Tech Stack
-- **Runtime Environment:** Node.js
-- **Web Framework:** Express.js
+- **Runtime:** Node.js
+- **Framework:** Express.js
 - **Database:** MongoDB (Native Driver)
-- **Authentication:** JSON Web Tokens (JWT) & Cookie Parser
-- **Payment Gateway:** Stripe API
-- **Security:** CORS, Environment Variables
+- **Authentication:** JWT (JSON Web Tokens) with HttpOnly Cookies
+- **Payment:** Stripe API (Checkout Sessions)
+- **Environment:** Dotenv
 
 ---
 
 ## ✨ Key Server Features
-- **Secure Authentication:** Implements JWT (JSON Web Tokens) with HTTP-Only cookies for secure session management.
-- **Role-Based Access Control (RBAC):** Middleware (`verifyToken`, `verifyAdmin`, `verifyModerator`) to restrict access based on user roles.
-- **Payment Processing:** Integrated Stripe Payment Intents/Sessions to handle secure transactions.
-- **Advanced Querying:** Supports search, filtering, and sorting for scholarship data using MongoDB aggregation and query operators.
-- **Analytics:** Aggregation pipelines to calculate platform statistics (total users, fees, applications) for the Admin Dashboard.
+- **🛡️ Secure Authentication:** Implements JWT with `httpOnly`, `secure`, and `sameSite` cookie attributes for robust session management.
+- **👮 Role-Based Access Control (RBAC):** Custom middleware (`verifyToken`, `verifyAdmin`, `verifyModerator`) ensures data integrity.
+- **🔒 Super Admin Protection:** Special logic prevents the deletion or demotion of the main Admin account (`isProtected: true`).
+- **💳 Secure Payments:** Stripe Payment Intent verification ensures database records are only updated after successful payment confirmation.
+- **📈 Advanced Analytics:** Uses MongoDB Aggregation Pipelines (`$group`, `$lookup`, `$unwind`) to generate reports on revenue, top universities, and category popularity.
+- **🔍 Public Data APIs:** Lightweight public endpoints for Home Page statistics, top-rated reviews, and trusted university partners.
 
 ---
 
@@ -49,80 +52,93 @@ npm install
 ```
 
 ### 3. Configure Environment Variables
-Create a .env file in the root directory and add the following:
-```bash
+Create a `.env` file in the root directory and add the following:
+```env
 PORT=5000
-DB_USER=your_mongodb_username
-DB_PASS=your_mongodb_password
-ACCESS_TOKEN_SECRET=your_random_secure_string_for_jwt
-STRIPE_SECRET_KEY=your_stripe_secret_key
+MONGODB_URL=mongodb+srv://<username>:<password>@cluster.mongodb.net/SchollerStream
+JWT_SECRET=your_secure_random_string
+STRIPE_SECRET_KEY=sk_test_...
 NODE_ENV=development
+DOMAIN_URL=http://localhost:5173
 ```
 
 ### 4. Run the Server
 ```bash 
-# Production mode
+# Production start
 npm start
 
-# Development mode (with Nodemon)
+# Development mode (Nodemon)
 npm run dev
 ```
 
-### 📡 API Endpoints Overview
-#### 🔐 Authentication
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| POST | /getToken | Generate JWT token and set cookie |
-| POST | /logout | Clear session and remove cookie |
+---
 
-#### 👤 Users
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| POST | /users | Create a new user (Student) |
-| GET | /users | Get all users (Admin only) |
-| GET | /users/:email | Get single user details |
-| PATCH | /users/role/:id | Update user role (Admin only) |
-| DELETE | /users/:id | Delete a user (Admin only) |
+## 📡 API Endpoints Overview
 
-#### 🎓 Scholarships
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| GET | /scholarships | Get all scholarships (with search/filter) |
-| GET | /scholarship/:id | Get single scholarship details |
-| POST | /scholarship | Add a new scholarship (Admin/Mod) |
-| PATCH | /scholarship/:id | Update |
+### 🔐 Auth & Users
+| Method | Endpoint | Description | Access |
+| :--- | :--- | :--- | :--- |
+| POST | `/getToken` | Generate JWT & set Cookie | Public |
+| POST | `/logout` | Clear Cookie | Public |
+| POST | `/users` | Register new user | Public |
+| GET | `/users` | Get all users | Admin |
+| PATCH | `/users/role/:id` | Promote/Demote User | Admin |
+| DELETE | `/users/:id` | Delete User (Protected Check) | Admin |
 
-#### 📝 Applications
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| POST | /apply | Submit a scholarship application |
-| GET | /application/:email | Get applications by user email |
-| GET | /all-applications | Get all applications (Moderator) |
-| PATCH | /application/status/:id | Update status (Pending/Processing/Completed) |
-| PATCH | /application/feedback/:id | Add moderator feedback |
+### 🎓 Scholarships
+| Method | Endpoint | Description | Access |
+| :--- | :--- | :--- | :--- |
+| GET | `/scholarships` | Get all (Search, Filter, Sort) | Public |
+| GET | `/scholarship/:id` | Get details & recommendations | Private |
+| POST | `/add-scholarship` | Create new scholarship | Admin |
+| PATCH | `/scholarship/:id` | Update scholarship | Admin |
+| DELETE | `/scholarship/:id` | Delete scholarship | Admin |
 
-#### 💳 Payments
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| POST | /create-checkout-session | Create Stripe payment session |
-| PATCH | /payment/success | Verify payment and update DB status |
+### 📝 Applications & Payment
+| Method | Endpoint | Description | Access |
+| :--- | :--- | :--- | :--- |
+| POST | `/create-checkout-session` | Initialize Stripe Payment | Student |
+| PATCH | `/payment/success` | Verify Payment & Save App | Student |
+| GET | `/applications` | Get all applications | Moderator |
+| GET | `/applications/:email/byUser` | Get my applications | Student |
+| PATCH | `/applications/feedback/:id` | Give Feedback | Moderator |
+| PATCH | `/applications/:id` | Update Status (Pending/Completed) | Moderator |
 
-#### 📊 Analytics
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| GET | /admin-stats | Get total users, revenue, and application counts |
+### 🏠 Public Home APIs
+| Method | Endpoint | Description | Access |
+| :--- | :--- | :--- | :--- |
+| GET | `/home-stats` | Counts (Users, Reviews, Funds) | Public |
+| GET | `/top-universities` | Unique universities list | Public |
+| GET | `/top-reviews` | 5-star reviews for slider | Public |
 
-### 📦 Dependencies
-```bash
+### 📊 Admin Analytics
+| Method | Endpoint | Description | Access |
+| :--- | :--- | :--- | :--- |
+| GET | `/analytics` | Revenue & Application charts data | Admin |
+
+---
+
+## 📂 Database Collections
+1.  **`users`**: Stores user profiles, roles, and protection flags.
+2.  **`scholarships`**: Stores university details, fees, deadlines, and requirements.
+3.  **`applications`**: Stores applicant info, payment transaction IDs, and status.
+4.  **`reviews`**: Stores student testimonials and ratings.
+5.  **`wishlists`**: Stores bookmarked scholarships for students.
+
+---
+
+## 📦 Main Dependencies
+```json
 "dependencies": {
-  "bcrypt": "^6.0.0",
   "cookie-parser": "^1.4.7",
   "cors": "^2.8.5",
-  "dotenv": "^17.2.3",
-  "express": "^5.2.1",
-  "jsonwebtoken": "^9.0.3",
-  "mongodb": "^7.0.0",
-  "stripe": "^20.0.0"
+  "dotenv": "^16.3.1",
+  "express": "^4.18.2",
+  "jsonwebtoken": "^9.0.2",
+  "mongodb": "^6.3.0",
+  "stripe": "^14.5.0"
 }
 ```
-#### Developed by Hasnat Fahmid Khan
+
+### 📞 Contact
+**Developed by Hasnat Fahmid Khan**
